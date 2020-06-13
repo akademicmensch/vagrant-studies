@@ -1,0 +1,94 @@
+----------Inicio----------
+1) Instalação:
+    - Instalar Virtual Box
+    - Instalar Vagrant
+
+2) Iniciar o box padrão
+- vagrant init hashicorp/precise64
+- vagrant up
+
+3) Conexão via SSH
+- vagrant ssh
+
+
+
+----------PORT FORWARDING----------
+Após subir a nova imagem ubuntu/bionic64, entrar na maquina:
+- sudo apt-get update
+- sudo apt-get install -y nginx
+- Para verificar: netstat -lntp (ver se a porta 80 está rodando)
+- curl http://localhost
+
+- colocar a seguinte configuração no vagrantFile:
+config.vm.network "forwarded_port", guest: 80, host:8089
+
+
+
+----------IP na rede privada----------
+- Adicionar no vagrantfile a seguinte configuração:
+config.vm.network "private_network", ip: "192.168.50.4"  //(assim podemos fazer ping da maquina local para a maquina virtual)
+
+
+----------DHCP do VirtualBox----------
+- A configuração de network deve ficar: config.vm.network "private_network", type: "dhcp"
+
+
+
+----------IP na rede publica(bridge)----------
+- A configuração de network deve ficar config.vm.network "public_network"
+- Pode-se também colocar um ip que sabe-se nao estar ocupado na rede publica
+
+
+
+----------Adicionando a chave ssh----------
+- Para criar a chave ssh: ssh-keygen -t rsa
+Pedir para salvar na pasta do vagrant file com o nome de id_bionic:
+home/guilherme/Desktop/vagrant/maquina-ubuntu/id_bionic
+- Copiar a chave publica(id_bionic.pub) para a maquina virtual(na maquina virtual): cp /vagrant/id_bionic.pub .
+- na máquina virtual: cat id_bionic.pub >> .ssh/authorized_keys
+- No sistema operacional normal, usar a chave privada para se conectar a maquina virtual: ssh -i id_bionic vagrant@192.168.50.4
+
+
+
+
+----------Shell Provisioner(para instalarmos programas, etc)----------
+- adicionar no vagrantFile a configuração:
+config.vm.provision "shell",
+inline: "echo hello, World"
+
+- o comando 'vagrant provision' também serve para executar os provisionadores
+
+
+
+
+
+
+----------Synced Folder e mais shell----------
+- no diretorio da maquina virtual no sistema operacional comum, criar um diretorio chamado configs: colocar o arquivo de chave publica lá dentro.
+- no vagrantfile, adicionar a linha: config.vm.synced_folder "./configs", "/configs"
+- adicionar ao arquivo vagrantFile o comando: 'cat /configs/id_bionic.pub >> .ssh/authorized_keys' na parte de config.vm.provision "shell"
+
+
+
+----------Provisionando mysql----------
+$script_mysql = <<-SCRIPT
+apt-get update && \
+apt-get install -y mysql-server-5.7 && \
+mysql -e "create user phpuser'@'%' identified by 'pass';"
+SCRIPT
+
+e adicionar mais um shell provisioner no vagrantfile: config.vm.provision "shell", inline: "$script_mysql"
+
+- o arquivo /etc/mysql/mysql.conf.d/mysqld.cnf na maquina virtual tem uma propriedade que deixa um ip estatico. Precisa-se provisionar ele tambem:
+- copiar o arquivo da maquina virtual para o pc local: cat /etc/mysql/mysql.conf.d/mysqld.cnf >> /configs/mysqld.cnf
+- abrir o arquivo, encontrar a propriedade 'bind-address' e colocar 0.0.0.0
+- alterar o arquivo vagrantFile e adicionar um novo provisionamento:
+config.vm.provision "shell", inline: "cat /configs/mysqld.cnf > /etc/mysql/mysql.conf.d/mysqld.cnf", inline: "service mysql restart"
+
+
+
+
+
+
+Multi-Machine -> diferentes maquinas dentro de um vagrantFile
+ - organizar as diferentes máquinas dentro de um unico arquivo vagrant. Ver código.
